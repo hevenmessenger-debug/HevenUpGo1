@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Heven - Облачный чат</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        /* Стили как в предыдущей версии */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --accent-color: #0a84ff;
+            --my-message-bg: #0a84ff;
+            --other-message-bg: rgba(44, 44, 46, 0.8);
+            --sidebar-bg: rgba(28, 28, 30, 0.95);
+            --header-bg: rgba(28, 28, 30, 0.8);
+            --text-color: #ffffff;
+            --secondary-text: #8e8e93;
+            --error-color: #ff453a;
+            --success-color: #30d158;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #000000;
+            color: var(--text-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #auth-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(28, 28, 30, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 30px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .auth-title {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-align: center;
+            background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .auth-subtitle {
+            color: var(--secondary-text);
+            margin-bottom: 30px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(44, 44, 46, 0.5);
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .auth-tab.active {
+            background: var(--accent-color);
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .glass-input {
+            width: 100%;
+            padding: 16px 20px;
+            margin: 8px 0;
+            background: rgba(44, 44, 46, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            color: white;
+            font-size: 16px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .glass-input:focus {
+            border-color: var(--accent-color);
+            background: rgba(58, 58, 60, 0.9);
+        }
+
+        .glass-button {
+            width: 100%;
+            padding: 16px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 17px;
+            font-weight: 600;
+            margin: 8px 0;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .glass-button:active {
+            transform: scale(0.98);
+        }
+
+        .glass-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .glass-button.secondary {
+            background: rgba(44, 44, 46, 0.8);
+        }
+
+        .info-text {
+            color: var(--secondary-text);
+            font-size: 13px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        #chat-screen {
+            display: none;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100%;
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: left 0.3s ease;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-header h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .user-info-sidebar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+
+        .user-avatar-sidebar {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 600;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .user-avatar-sidebar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-details-sidebar {
+            flex: 1;
+        }
+
+        .user-name-sidebar {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .user-role-sidebar {
+            font-size: 13px;
+            color: var(--secondary-text);
+        }
+
+        .invite-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+
+        .invite-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+        }
+
+        .invite-code {
+            font-size: 14px;
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        .wallpaper-section {
+            margin: 20px 0;
+        }
+
+        .wallpaper-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .wallpaper-option {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .wallpaper-option:hover {
+            border-color: var(--accent-color);
+        }
+
+        .wallpaper-option.dark { background: #000000; }
+        .wallpaper-option.gradient1 { background: linear-gradient(135deg, #0a84ff, #5e5ce6); }
+        .wallpaper-option.gradient2 { background: linear-gradient(135deg, #ff9a0a, #ff375f); }
+        .wallpaper-option.gradient3 { background: linear-gradient(135deg, #30d158, #64d2ff); }
+        .wallpaper-option.gradient4 { background: linear-gradient(135deg, #bf5af2, #ff6482); }
+        .wallpaper-option.gradient5 { background: linear-gradient(135deg, #ffd60a, #ff9f0a); }
+
+        .custom-wallpaper-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        #wallpaperInput, #avatarInput {
+            display: none;
+        }
+
+        .chats-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .chat-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-bottom: 4px;
+        }
+
+        .chat-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-item.active {
+            background: rgba(10, 132, 255, 0.2);
+        }
+
+        .chat-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 600;
+            color: white;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .chat-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .chat-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .chat-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-last-message {
+            font-size: 13px;
+            color: var(--secondary-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 90;
+            display: none;
+        }
+
+        .sidebar-overlay.open {
+            display: block;
+        }
+
+        .chat-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: background-image 0.3s;
+        }
+
+        .chat-header {
+            background: var(--header-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .current-chat-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .current-chat-name {
+            font-weight: 600;
+            font-size: 17px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .current-chat-status {
+            font-size: 13px;
+            color: var(--secondary-text);
+        }
+
+        .header-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            overflow: hidden;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .header-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message-wrapper {
+            display: flex;
+            gap: 10px;
+            max-width: 85%;
+            animation: messageAppear 0.3s;
+        }
+
+        @keyframes messageAppear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-wrapper.my-message {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .message-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .message-sender {
+            font-size: 13px;
+            color: var(--secondary-text);
+            margin-bottom: 4px;
+            padding-left: 8px;
+        }
+
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            width: fit-content;
+            max-width: 100%;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .message-bubble img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+
+        .my-message .message-bubble {
+            background: var(--accent-color);
+            color: white;
+            border-bottom-right-radius: 4px;
+            margin-left: auto;
+        }
+
+        .message-wrapper:not(.my-message) .message-bubble {
+            background: rgba(44, 44, 46, 0.8);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--secondary-text);
+            margin-top: 4px;
+            padding: 0 8px;
+        }
+
+        .my-message .message-time {
+            text-align: right;
+        }
+
+        .input-area {
+            padding: 12px 16px;
+            background: transparent;
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .emoji-bar {
+            display: flex;
+            gap: 8px;
+            padding: 8px 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .emoji-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .emoji-btn {
+            background: rgba(44, 44, 46, 0.5);
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: transform 0.2s;
+            white-space: nowrap;
+        }
+
+        .emoji-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .message-input-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            background: rgba(44, 44, 46, 0.3);
+            border-radius: 24px;
+            padding: 4px 4px 4px 16px;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+        }
+
+        #msgInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 12px 0;
+            color: white;
+            font-size: 16px;
+            outline: none;
+            max-height: 100px;
+            resize: none;
+            font-family: inherit;
+        }
+
+        #msgInput::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .attach-btn, .emoji-picker-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 25px;
+            background: var(--accent-color);
+            border: none;
+            color: white;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(10, 132, 255, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .emoji-panel {
+            position: fixed;
+            bottom: 100px;
+            left: 16px;
+            right: 16px;
+            max-width: 400px;
+            margin: 0 auto;
+            background: rgba(44, 44, 46, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 16px;
+            display: none;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .emoji-panel.show {
+            display: grid;
+        }
+
+        .emoji-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: background 0.2s;
+        }
+
+        .emoji-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .image-preview {
+            padding: 8px 16px;
+            background: rgba(44, 44, 46, 0.3);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .image-preview.show {
+            display: flex;
+        }
+
+        .preview-img {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+
+        .preview-info {
+            flex: 1;
+            font-size: 13px;
+            color: var(--secondary-text);
+        }
+
+        .cancel-preview {
+            width: 30px;
+            height: 30px;
+            border-radius: 15px;
+            background: rgba(255, 69, 58, 0.3);
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photo-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .photo-viewer.show {
+            display: flex;
+        }
+
+        .photo-viewer img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 12px;
+        }
+
+        .close-viewer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 30px;
+            color: white;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            text-align: center;
+            padding: 12px;
+            margin: 10px 0;
+            background: rgba(255, 69, 58, 0.1);
+            border-radius: 12px;
+            display: none;
+        }
+
+        .success-message {
+            color: var(--success-color);
+            text-align: center;
+            padding: 12px;
+            margin: 10px 0;
+            background: rgba(48, 209, 88, 0.1);
+            border-radius: 12px;
+            display: none;
+        }
+
+        .debug-info {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 300px;
+            z-index: 2000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="auth-screen">
+    <div class="auth-container">
+        <div class="auth-title">Heven</div>
+        <div class="auth-subtitle">Облачный зашифрованный чат</div>
+        
+        <div id="auth-error" class="error-message"></div>
+        <div id="auth-success" class="success-message"></div>
+        
+        <div class="auth-tabs">
+            <div class="auth-tab active" onclick="switchAuthTab('register')">Создать чат</div>
+            <div class="auth-tab" onclick="switchAuthTab('join')">Присоединиться</div>
+        </div>
+        
+        <!-- Форма создания чата -->
+        <div id="register-form" class="auth-form active">
+            <input type="text" id="regChatName" class="glass-input" placeholder="Название чата" autocomplete="off">
+            <input type="password" id="regPassword" class="glass-input" placeholder="Пароль" autocomplete="off">
+            <input type="password" id="regConfirmPassword" class="glass-input" placeholder="Подтверждение пароля" autocomplete="off">
+            <input type="text" id="regAdminName" class="glass-input" placeholder="Ваше имя" autocomplete="off">
+            <button class="glass-button" onclick="register()">Создать чат</button>
+            <div class="info-text">Вы станете администратором чата</div>
+        </div>
+        
+        <!-- Форма присоединения -->
+        <div id="join-form" class="auth-form">
+            <input type="text" id="joinUsername" class="glass-input" placeholder="Ваше имя" autocomplete="off">
+            <input type="text" id="joinChatName" class="glass-input" placeholder="Название чата" autocomplete="off">
+            <input type="password" id="joinPassword" class="glass-input" placeholder="Пароль чата" autocomplete="off">
+            <button class="glass-button" onclick="joinChat()">Присоединиться</button>
+            <div class="info-text">Введите данные чата для входа</div>
+        </div>
+    </div>
+</div>
+
+<div id="chat-screen">
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="user-info-sidebar" id="userInfoSidebar">
+                <div class="user-avatar-sidebar" id="sidebarAvatar" onclick="document.getElementById('avatarInput').click()">
+                    <span id="sidebarAvatarText"></span>
+                    <img id="sidebarAvatarImg" src="" style="display: none;">
+                </div>
+                <div class="user-details-sidebar">
+                    <div class="user-name-sidebar" id="sidebarUserName">Загрузка...</div>
+                    <div class="user-role-sidebar" id="sidebarUserRole">Участник</div>
+                </div>
+            </div>
+            
+            <!-- Информация о чате -->
+            <div class="invite-section" id="inviteSection" style="display: none;">
+                <div class="invite-title">🔑 Данные для подключения</div>
+                <div class="invite-code">
+                    <div>Название: <span id="chatNameInfo"></span></div>
+                    <div>Пароль: ••••••••</div>
+                </div>
+                <button class="glass-button secondary" onclick="copyChatInfo()">Копировать название чата</button>
+            </div>
+            
+            <!-- Секция обоев -->
+            <div class="wallpaper-section">
+                <h4>Обои чата</h4>
+                <div class="wallpaper-grid">
+                    <div class="wallpaper-option dark" onclick="changeWallpaper('dark')"></div>
+                    <div class="wallpaper-option gradient1" onclick="changeWallpaper('gradient1')"></div>
+                    <div class="wallpaper-option gradient2" onclick="changeWallpaper('gradient2')"></div>
+                    <div class="wallpaper-option gradient3" onclick="changeWallpaper('gradient3')"></div>
+                    <div class="wallpaper-option gradient4" onclick="changeWallpaper('gradient4')"></div>
+                    <div class="wallpaper-option gradient5" onclick="changeWallpaper('gradient5')"></div>
+                </div>
+                <button class="custom-wallpaper-btn" onclick="document.getElementById('wallpaperInput').click()">
+                    📁 Загрузить свои обои
+                </button>
+                <input type="file" id="wallpaperInput" accept="image/*" onchange="handleCustomWallpaper(event)">
+            </div>
+            
+            <h3>Участники чата</h3>
+        </div>
+        
+        <div class="chats-list" id="chatsList"></div>
+    </div>
+    
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    
+    <div class="chat-container" id="chatContainer">
+        <div class="chat-header">
+            <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+            <div class="current-chat-info">
+                <div class="current-chat-name" id="currentChatName">Heven</div>
+                <div class="current-chat-status" id="currentChatStatus">
+                    <span id="participantsCount">0</span> участников
+                </div>
+            </div>
+            <div class="header-avatar" id="userAvatar" onclick="document.getElementById('avatarInput').click()">
+                <span id="avatarText"></span>
+                <img id="avatarImg" src="" style="display: none;">
+            </div>
+        </div>
+        
+        <div id="messages"></div>
+        
+        <div class="emoji-panel" id="emojiPanel"></div>
+        
+        <div class="image-preview" id="imagePreview">
+            <img class="preview-img" id="previewImg" src="">
+            <div class="preview-info" id="previewInfo">Изображение выбрано</div>
+            <button class="cancel-preview" onclick="cancelImagePreview()">✕</button>
+        </div>
+        
+        <input type="file" id="avatarInput" accept="image/*" onchange="handleAvatarUpload(event)" style="display: none;">
+        
+        <div class="input-area">
+            <div class="input-wrapper">
+                <div class="emoji-bar" id="emojiBar"></div>
+                <div class="message-input-wrapper">
+                    <textarea id="msgInput" placeholder="Сообщение..." rows="1" oninput="autoResize(this)"></textarea>
+                    <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+                    <button class="emoji-picker-btn" onclick="toggleEmojiPanel()">😊</button>
+                </div>
+            </div>
+            <button class="send-btn" onclick="sendMessage()" id="sendBtn">➤</button>
+        </div>
+    </div>
+</div>
+
+<div class="photo-viewer" id="photoViewer" onclick="closePhotoViewer()">
+    <span class="close-viewer">✕</span>
+    <img id="viewerImage" src="">
+</div>
+
+<input type="file" id="fileInput" accept="image/*" onchange="handleImageUpload(event)" style="display: none;">
+
+<!-- Отладочная панель -->
+<div class="debug-info" id="debugInfo"></div>
+
+1<script>
+    // GitHub конфигурация - нужно заменить на свои данные
+    // КАК ПОЛУЧИТЬ ТОКЕН:
+    // 1. Зайдите на https://github.com/settings/tokens
+    // 2. Нажмите "Generate new token" -> "Generate new token (classic)"
+    // 3. Дайте имя, поставьте галочку только "gist"
+    // 4. Нажмите "Generate token" и скопируйте его
+    const GIST_ID = 'd1aa3b6b990a7b1a8b9bbd13fa557e9e';
+    const GITHUB_TOKEN = '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'; // ВСТАВЬТЕ СЮДА НОВЫЙ ТОКЕН
+    
+    const CHATS_FILE = 'chats.txt';
+    const MESSAGES_PREFIX = 'messages_';
+    const USERS_PREFIX = 'users_';
+    const AVATARS_FILE = 'avatars.txt';
+
+    // Состояние приложения
+    let currentUser = null;
+    let currentChat = null;
+    let currentRole = 'user';
+    let lastMessages = [];
+    let updateInterval = null;
+    let isSending = false;
+    let userAvatars = {};
+    let pendingImage = null;
+    let chats = {};
+    let participants = [];
+
+    const popularEmojis = ['😊', '😂', '❤️', '👍', '🔥', '🎉', '😢', '😍', '🤔', '👋', '🙏', '✨'];
+    const allEmojis = ['😊', '😂', '❤️', '👍', '🔥', '🎉', '😢', '😍', '🤔', '👋', '🙏', '✨', 
+                       '⭐', '🌈', '🍕', '🎂', '🐱', '🐶', '🌸', '🌺', '🍀', '🌍', '🚀', '⭐'];
+
+    function debugLog(message) {
+        console.log(message);
+        const debugEl = document.getElementById('debugInfo');
+        debugEl.style.display = 'block';
+        debugEl.innerHTML = message + '<br>' + debugEl.innerHTML;
+        setTimeout(() => {
+            debugEl.style.display = 'none';
+        }, 5000);
+    }
+
+    function init() {
+        debugLog('Запуск Heven...');
+        debugLog('GIST_ID: ' + GIST_ID);
+        debugLog('TOKEN: ' + (GITHUB_TOKEN ? 'установлен' : 'не установлен'));
+        
+        if (GITHUB_TOKEN === 'ваш_новый_токен_здесь') {
+            debugLog('⚠️ ВНИМАНИЕ: Нужно вставить настоящий токен GitHub!');
+            showAuthError('Вставьте настоящий токен GitHub в код!');
+        }
+        
+        loadAvatars();
+        loadChats();
+        initEmojiBar();
+        initEmojiPanel();
+        loadWallpaper();
+        
+        // По умолчанию показываем вкладку создания чата
+        switchAuthTab('register');
+    }
+
+    async function loadAvatars() {
+        try {
+            const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.files && data.files[AVATARS_FILE]) {
+                    const encrypted = data.files[AVATARS_FILE].content;
+                    try {
+                        const bytes = CryptoJS.AES.decrypt(encrypted, 'heven-avatars-key');
+                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+                        if (decrypted) {
+                            userAvatars = JSON.parse(decrypted);
+                        }
+                    } catch (e) {
+                        console.log('Error decrypting avatars');
+                        userAvatars = {};
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error loading avatars:', err);
+            userAvatars = {};
+        }
+    }
+
+    async function saveAvatars() {
+        try {
+            const encrypted = CryptoJS.AES.encrypt(JSON.stringify(userAvatars), 'heven-avatars-key').toString();
+            
+            const getResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (!getResponse.ok) throw new Error('Failed to get gist');
+            
+            const gistData = await getResponse.json();
+            const files = {};
+            files[AVATARS_FILE] = { content: encrypted };
+            
+            if (gistData.files && gistData.files[CHATS_FILE]) {
+                files[CHATS_FILE] = { content: gistData.files[CHATS_FILE].content };
+            }
+            
+            await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ files })
+            });
+            
+        } catch (err) {
+            console.error('Error saving avatars:', err);
+        }
+    }
+
+    async function loadChats() {
+        try {
+            debugLog('Загрузка списка чатов...');
+            const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.files && data.files[CHATS_FILE]) {
+                    const encrypted = data.files[CHATS_FILE].content;
+                    if (encrypted && encrypted.trim()) {
+                        try {
+                            const bytes = CryptoJS.AES.decrypt(encrypted, 'heven-secret-key');
+                            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+                            if (decrypted) {
+                                chats = JSON.parse(decrypted);
+                                debugLog('Загружены чаты: ' + Object.keys(chats).join(', '));
+                                return;
+                            }
+                        } catch (e) {
+                            debugLog('Ошибка расшифровки чатов: ' + e.message);
+                        }
+                    } else {
+                        debugLog('Файл chats.txt пуст');
+                    }
+                } else {
+                    debugLog('Файл chats.txt не найден в Gist');
+                    
+                    // Создаем пустой файл chats.txt
+                    await createEmptyChatsFile();
+                }
+            } else {
+                debugLog('Ошибка загрузки Gist: ' + response.status);
+                if (response.status === 401) {
+                    showAuthError('Ошибка авторизации GitHub. Проверьте токен!');
+                } else if (response.status === 404) {
+                    showAuthError('Gist не найден. Проверьте GIST_ID!');
+                }
+            }
+            chats = {};
+            debugLog('Нет сохраненных чатов');
+            
+        } catch (err) {
+            console.error('Error loading chats:', err);
+            debugLog('Ошибка загрузки: ' + err.message);
+            chats = {};
+        }
+    }
+    
+    async function createEmptyChatsFile() {
+        try {
+            debugLog('Создание пустого файла chats.txt...');
+            const emptyChats = {};
+            const encrypted = CryptoJS.AES.encrypt(JSON.stringify(emptyChats), 'heven-secret-key').toString();
+            
+            const getResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (!getResponse.ok) return;
+            
+            const gistData = await getResponse.json();
+            const files = {};
+            files[CHATS_FILE] = { content: encrypted };
+            
+            // Сохраняем другие файлы
+            if (gistData.files) {
+                for (let filename in gistData.files) {
+                    if (filename !== CHATS_FILE && gistData.files[filename]) {
+                        files[filename] = { content: gistData.files[filename].content };
+                    }
+                }
+            }
+            
+            await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ files })
+            });
+            
+            debugLog('Файл chats.txt создан');
+            
+        } catch (err) {
+            console.error('Error creating chats file:', err);
+        }
+    }
+
+    async function saveChats() {
+        try {
+            debugLog('Сохранение чатов...');
+            const encrypted = CryptoJS.AES.encrypt(JSON.stringify(chats), 'heven-secret-key').toString();
+            
+            const getResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (!getResponse.ok) {
+                debugLog('Ошибка получения Gist: ' + getResponse.status);
+                throw new Error('Failed to get gist');
+            }
+            
+            const gistData = await getResponse.json();
+            const files = {};
+            files[CHATS_FILE] = { content: encrypted };
+            
+            if (gistData.files && gistData.files[AVATARS_FILE]) {
+                files[AVATARS_FILE] = { content: gistData.files[AVATARS_FILE].content };
+            }
+            
+            const updateResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ files })
+            });
+            
+            if (updateResponse.ok) {
+                debugLog('Чаты успешно сохранены');
+            } else {
+                debugLog('Ошибка сохранения: ' + updateResponse.status);
+                const errorText = await updateResponse.text();
+                debugLog('Ошибка: ' + errorText);
+            }
+            
+        } catch (err) {
+            console.error('Error saving chats:', err);
+            debugLog('Ошибка сохранения: ' + err.message);
+            throw err;
+        }
+    }
+
+    async function loadMessages() {
+        if (!currentChat) return;
+        
+        try {
+            const fileName = MESSAGES_PREFIX + currentChat + '.txt';
+            const response = await fetch(`https://api.github.com/gists/${GIST_ID}?t=${Date.now()}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            if (!response.ok) throw new Error('GitHub API error');
+
+            const data = await response.json();
+            const content = data.files && data.files[fileName] ? data.files[fileName].content : '';
+            
+            const encryptedMessages = content.split('\n').filter(line => line.trim());
+            
+            const decryptedMessages = [];
+            for (const encrypted of encryptedMessages) {
+                try {
+                    const bytes = CryptoJS.AES.decrypt(encrypted, currentChat);
+                    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+                    if (decrypted && decrypted.includes(':')) {
+                        decryptedMessages.push(decrypted);
+                    }
+                } catch (e) {
+                    console.log('Failed to decrypt message');
+                }
+            }
+
+            if (JSON.stringify(lastMessages) !== JSON.stringify(decryptedMessages)) {
+                lastMessages = decryptedMessages;
+                displayMessages(lastMessages);
+            }
+
+        } catch (err) {
+            console.error('Load error:', err);
+        }
+    }
+
+    async function saveMessage(message) {
+        if (!currentChat) return;
+        
+        try {
+            const fileName = MESSAGES_PREFIX + currentChat + '.txt';
+            const encrypted = CryptoJS.AES.encrypt(message, currentChat).toString();
+
+            const getResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            if (!getResponse.ok) throw new Error('Failed to get gist');
+
+            const gistData = await getResponse.json();
+            const oldContent = gistData.files && gistData.files[fileName] ? gistData.files[fileName].content : '';
+            const newContent = oldContent + (oldContent ? '\n' : '') + encrypted;
+
+            const files = {};
+            files[fileName] = { content: newContent };
+            
+            if (gistData.files && gistData.files[CHATS_FILE]) {
+                files[CHATS_FILE] = { content: gistData.files[CHATS_FILE].content };
+            }
+            if (gistData.files && gistData.files[AVATARS_FILE]) {
+                files[AVATARS_FILE] = { content: gistData.files[AVATARS_FILE].content };
+            }
+
+            await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ files })
+            });
+
+            await loadMessages();
+
+        } catch (err) {
+            console.error('Save error:', err);
+            throw err;
+        }
+    }
+
+    async function loadParticipants(chatName) {
+        if (!chatName) return;
+        
+        try {
+            const fileName = USERS_PREFIX + chatName + '.txt';
+            const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.files && data.files[fileName]) {
+                    const encrypted = data.files[fileName].content;
+                    if (encrypted && encrypted.trim()) {
+                        try {
+                            const bytes = CryptoJS.AES.decrypt(encrypted, chatName);
+                            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+                            if (decrypted) {
+                                participants = JSON.parse(decrypted);
+                                return;
+                            }
+                        } catch (e) {
+                            console.log('Error decrypting participants');
+                        }
+                    }
+                }
+            }
+            participants = [];
+            
+        } catch (err) {
+            console.error('Error loading participants:', err);
+            participants = [];
+        }
+    }
+
+    async function saveParticipants() {
+        if (!currentChat) return;
+        
+        try {
+            const fileName = USERS_PREFIX + currentChat + '.txt';
+            const encrypted = CryptoJS.AES.encrypt(JSON.stringify(participants), currentChat).toString();
+            
+            const getResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { 
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (!getResponse.ok) throw new Error('Failed to get gist');
+            
+            const gistData = await getResponse.json();
+            const files = {};
+            files[fileName] = { content: encrypted };
+            
+            if (gistData.files && gistData.files[CHATS_FILE]) {
+                files[CHATS_FILE] = { content: gistData.files[CHATS_FILE].content };
+            }
+            if (gistData.files && gistData.files[AVATARS_FILE]) {
+                files[AVATARS_FILE] = { content: gistData.files[AVATARS_FILE].content };
+            }
+            
+            await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ files })
+            });
+            
+            document.getElementById('participantsCount').textContent = participants.length;
+            updateParticipantsList();
+            
+        } catch (err) {
+            console.error('Error saving participants:', err);
+        }
+    }
+
+    function switchAuthTab(tab) {
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+        
+        if (tab === 'register') {
+            document.querySelectorAll('.auth-tab')[0].classList.add('active');
+            document.getElementById('register-form').classList.add('active');
+        } else {
+            document.querySelectorAll('.auth-tab')[1].classList.add('active');
+            document.getElementById('join-form').classList.add('active');
+        }
+    }
+
+    async function register() {
+        const chatName = document.getElementById('regChatName').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const confirmPassword = document.getElementById('regConfirmPassword').value;
+        const adminName = document.getElementById('regAdminName').value.trim();
+
+        if (!chatName || !password || !confirmPassword || !adminName) {
+            showAuthError('Заполните все поля');
+            return;
+        }
+
+        if (password.length < 4) {
+            showAuthError('Пароль должен быть не менее 4 символов');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            showAuthError('Пароли не совпадают');
+            return;
+        }
+
+        await loadChats();
+
+        if (chats[chatName]) {
+            showAuthError('Чат с таким названием уже существует');
+            return;
+        }
+
+        const chatId = Date.now().toString();
+        chats[chatName] = {
+            id: chatId,
+            password: CryptoJS.SHA256(password).toString(),
+            admin: adminName,
+            created: Date.now(),
+            users: [adminName]
+        };
+
+        await saveChats();
+        
+        currentUser = adminName;
+        currentChat = chatName;
+        currentRole = 'admin';
+        participants = [adminName];
+        
+        await saveParticipants();
+        
+        // Обновляем интерфейс
+        document.getElementById('currentChatName').textContent = chatName;
+        document.getElementById('sidebarUserName').textContent = adminName;
+        document.getElementById('sidebarUserRole').textContent = 'Админ';
+        
+        // Показываем информацию о чате для админа
+        document.getElementById('inviteSection').style.display = 'block';
+        document.getElementById('chatNameInfo').textContent = chatName;
+        
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('chat-screen').style.display = 'block';
+        
+        showAuthSuccess('Чат создан! Другие могут присоединиться по названию и паролю');
+        debugLog('Чат создан: ' + chatName);
+        
+        await loadMessages();
+        updateAllAvatars();
+        updateParticipantsList();
+        
+        if (updateInterval) clearInterval(updateInterval);
+        updateInterval = setInterval(loadMessages, 3000);
+    }
+
+    async function joinChat() {
+        const username = document.getElementById('joinUsername').value.trim();
+        const chatName = document.getElementById('joinChatName').value.trim();
+        const password = document.getElementById('joinPassword').value;
+
+        if (!username || !chatName || !password) {
+            showAuthError('Заполните все поля');
+            return;
+        }
+
+        await loadChats();
+
+        debugLog('Поиск чата: ' + chatName);
+        debugLog('Доступные чаты: ' + Object.keys(chats).join(', '));
+
+        const chatData = chats[chatName];
+        if (!chatData) {
+            showAuthError('Чат не найден. Доступные чаты: ' + Object.keys(chats).join(', '));
+            return;
+        }
+
+        const hashedPassword = CryptoJS.SHA256(password).toString();
+        if (chatData.password !== hashedPassword) {
+            showAuthError('Неверный пароль');
+            return;
+        }
+
+        // Добавляем пользователя в список пользователей чата
+        if (!chatData.users.includes(username)) {
+            chatData.users.push(username);
+            await saveChats();
+        }
+
+        await loadParticipants(chatName);
+        if (!participants.includes(username)) {
+            participants.push(username);
+            await saveParticipants();
+        }
+
+        currentUser = username;
+        currentChat = chatName;
+        currentRole = username === chatData.admin ? 'admin' : 'user';
+
+        // Обновляем интерфейс
+        document.getElementById('currentChatName').textContent = chatName;
+        document.getElementById('sidebarUserName').textContent = username;
+        document.getElementById('sidebarUserRole').textContent = currentRole === 'admin' ? 'Админ' : 'Участник';
+        
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('chat-screen').style.display = 'block';
+        
+        // Если пользователь админ, показываем информацию о чате
+        if (currentRole === 'admin') {
+            document.getElementById('inviteSection').style.display = 'block';
+            document.getElementById('chatNameInfo').textContent = chatName;
+        }
+        
+        await loadMessages();
+        updateAllAvatars();
+        updateParticipantsList();
+        
+        if (updateInterval) clearInterval(updateInterval);
+        updateInterval = setInterval(loadMessages, 3000);
+        
+        showAuthSuccess('Добро пожаловать в чат!');
+        debugLog('Подключение к чату: ' + chatName);
+    }
+
+    function updateAllAvatars() {
+        if (!currentUser) return;
+        
+        const avatarText = document.getElementById('avatarText');
+        const avatarImg = document.getElementById('avatarImg');
+        const sidebarAvatarText = document.getElementById('sidebarAvatarText');
+        const sidebarAvatarImg = document.getElementById('sidebarAvatarImg');
+        
+        if (userAvatars[currentUser]) {
+            avatarText.style.display = 'none';
+            avatarImg.style.display = 'block';
+            avatarImg.src = userAvatars[currentUser];
+            
+            sidebarAvatarText.style.display = 'none';
+            sidebarAvatarImg.style.display = 'block';
+            sidebarAvatarImg.src = userAvatars[currentUser];
+        } else {
+            avatarText.style.display = 'block';
+            avatarImg.style.display = 'none';
+            avatarText.textContent = currentUser.charAt(0).toUpperCase();
+            
+            sidebarAvatarText.style.display = 'block';
+            sidebarAvatarImg.style.display = 'none';
+            sidebarAvatarText.textContent = currentUser.charAt(0).toUpperCase();
+        }
+        
+        updateParticipantsList();
+        displayMessages(lastMessages);
+    }
+
+    function updateParticipantsList() {
+        const chatsList = document.getElementById('chatsList');
+        if (!chatsList) return;
+        
+        let html = '';
+        participants.forEach(user => {
+            const avatar = userAvatars[user] || null;
+            const isAdmin = chats[currentChat]?.admin === user;
+            html += `<div class="chat-item">
+                <div class="chat-avatar">
+                    ${avatar ? `<img src="${avatar}" onerror="this.style.display='none';this.parentElement.innerHTML='${user.charAt(0).toUpperCase()}'">` : user.charAt(0).toUpperCase()}
+                </div>
+                <div class="chat-info">
+                    <div class="chat-name">${user} ${isAdmin ? '👑' : ''}</div>
+                    <div class="chat-last-message">${isAdmin ? 'Админ' : 'Участник'}</div>
+                </div>
+            </div>`;
+        });
+
+        chatsList.innerHTML = html;
+        document.getElementById('participantsCount').textContent = participants.length;
+    }
+
+    function displayMessages(messages) {
+        const msgDiv = document.getElementById('messages');
+        const wasAtBottom = isScrolledToBottom();
+        
+        if (messages.length === 0) {
+            msgDiv.innerHTML = '<div style="text-align: center; color: var(--secondary-text); padding: 40px;">👋 Добро пожаловать в Heven!</div>';
+            return;
+        }
+
+        let html = '';
+        messages.forEach(msg => {
+            const colonIndex = msg.indexOf(':');
+            if (colonIndex === -1) return;
+            
+            const sender = msg.substring(0, colonIndex).trim();
+            const messagePart = msg.substring(colonIndex + 1).trim();
+            const isMyMessage = sender === currentUser;
+            const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            
+            const senderAvatar = userAvatars[sender] || null;
+
+            const imageMatch = messagePart.match(/\[IMAGE:(.*?)\]/);
+            let displayText = messagePart;
+            let imageHtml = '';
+
+            if (imageMatch) {
+                const imageId = imageMatch[1];
+                const imageKey = `heven_image_${currentChat}_${imageId}`;
+                const encryptedImage = localStorage.getItem(imageKey);
+                
+                if (encryptedImage) {
+                    try {
+                        const bytes = CryptoJS.AES.decrypt(encryptedImage, currentChat);
+                        const imageData = bytes.toString(CryptoJS.enc.Utf8);
+                        imageHtml = `<img src="${imageData}" onclick="openPhotoViewer('${imageData}')">`;
+                    } catch (e) {}
+                }
+                displayText = displayText.replace(/\[IMAGE:.*?\]/, '').trim();
+            }
+
+            if (isMyMessage) {
+                html += `
+                    <div class="message-wrapper my-message">
+                        <div class="message-content">
+                            <div class="message-bubble">
+                                ${imageHtml}
+                                ${displayText ? `<div>${escapeHtml(displayText)}</div>` : ''}
+                            </div>
+                            <div class="message-time">${time}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="message-wrapper">
+                        <div class="message-avatar">
+                            ${senderAvatar ? `<img src="${senderAvatar}" onerror="this.style.display='none';this.parentElement.innerHTML='${sender.charAt(0).toUpperCase()}'">` : sender.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="message-content">
+                            <div class="message-sender">${sender}</div>
+                            <div class="message-bubble">
+                                ${imageHtml}
+                                ${displayText ? `<div>${escapeHtml(displayText)}</div>` : ''}
+                            </div>
+                            <div class="message-time">${time}</div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        msgDiv.innerHTML = html;
+
+        if (wasAtBottom) {
+            scrollToBottom();
+        }
+    }
+
+    async function handleAvatarUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, выберите изображение');
+            return;
+        }
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Файл слишком большой. Максимальный размер 2MB');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const avatarData = e.target.result;
+            
+            userAvatars[currentUser] = avatarData;
+            
+            await saveAvatars();
+            
+            updateAllAvatars();
+            
+            showAuthSuccess('Аватар обновлен!');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function sendMessage() {
+        if (isSending || !currentChat) return;
+        
+        const input = document.getElementById('msgInput');
+        const text = input.value.trim();
+        
+        if (!text && !pendingImage) return;
+
+        isSending = true;
+        document.getElementById('sendBtn').disabled = true;
+        
+        let messageContent = text;
+        if (pendingImage) {
+            messageContent = `[Фото] ${text}`;
+        }
+        
+        let fullMessage = `${currentUser}: ${messageContent}`;
+        input.value = '';
+        autoResize(input);
+
+        try {
+            if (pendingImage) {
+                const imageId = Date.now().toString();
+                const imageKey = `heven_image_${currentChat}_${imageId}`;
+                const encrypted = CryptoJS.AES.encrypt(pendingImage, currentChat).toString();
+                
+                localStorage.setItem(imageKey, encrypted);
+                fullMessage += ` [IMAGE:${imageId}]`;
+                cancelImagePreview();
+            }
+
+            await saveMessage(fullMessage);
+            scrollToBottom();
+
+        } catch (err) {
+            console.error('Send error:', err);
+            alert('Ошибка при отправке');
+        } finally {
+            isSending = false;
+            document.getElementById('sendBtn').disabled = false;
+        }
+    }
+
+    function handleCustomWallpaper(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, выберите изображение');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Файл слишком большой. Максимальный размер 5MB');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const wallpaperData = e.target.result;
+            document.getElementById('chatContainer').style.background = `url('${wallpaperData}') center/cover`;
+            localStorage.setItem('heven_wallpaper', wallpaperData);
+            toggleSidebar();
+            showAuthSuccess('Обои обновлены!');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function changeWallpaper(type) {
+        let gradient = '';
+        switch(type) {
+            case 'dark': gradient = '#000000'; break;
+            case 'gradient1': gradient = 'linear-gradient(135deg, #0a84ff, #5e5ce6)'; break;
+            case 'gradient2': gradient = 'linear-gradient(135deg, #ff9a0a, #ff375f)'; break;
+            case 'gradient3': gradient = 'linear-gradient(135deg, #30d158, #64d2ff)'; break;
+            case 'gradient4': gradient = 'linear-gradient(135deg, #bf5af2, #ff6482)'; break;
+            case 'gradient5': gradient = 'linear-gradient(135deg, #ffd60a, #ff9f0a)'; break;
+        }
+        document.getElementById('chatContainer').style.background = gradient;
+        localStorage.setItem('heven_wallpaper', type);
+        toggleSidebar();
+    }
+
+    function loadWallpaper() {
+        const saved = localStorage.getItem('heven_wallpaper');
+        if (saved) {
+            if (saved.startsWith('data:image') || saved.startsWith('http')) {
+                document.getElementById('chatContainer').style.background = `url('${saved}') center/cover`;
+            } else {
+                changeWallpaper(saved);
+            }
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebarOverlay').classList.toggle('open');
+    }
+
+    function copyChatInfo() {
+        const chatName = document.getElementById('chatNameInfo').textContent;
+        navigator.clipboard.writeText(chatName).then(() => {
+            showAuthSuccess('Название чата скопировано!');
+        });
+    }
+
+    function initEmojiBar() {
+        const bar = document.getElementById('emojiBar');
+        popularEmojis.forEach(emoji => {
+            const btn = document.createElement('button');
+            btn.className = 'emoji-btn';
+            btn.textContent = emoji;
+            btn.onclick = () => addEmoji(emoji);
+            bar.appendChild(btn);
+        });
+    }
+
+    function initEmojiPanel() {
+        const panel = document.getElementById('emojiPanel');
+        allEmojis.forEach(emoji => {
+            const item = document.createElement('div');
+            item.className = 'emoji-item';
+            item.textContent = emoji;
+            item.onclick = () => {
+                addEmoji(emoji);
+                toggleEmojiPanel();
+            };
+            panel.appendChild(item);
+        });
+    }
+
+    function toggleEmojiPanel() {
+        document.getElementById('emojiPanel').classList.toggle('show');
+    }
+
+    function addEmoji(emoji) {
+        const input = document.getElementById('msgInput');
+        input.value += emoji;
+        input.focus();
+    }
+
+    function autoResize(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+    }
+
+    function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, выберите изображение');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Файл слишком большой. Максимальный размер 5MB');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            pendingImage = e.target.result;
+            document.getElementById('previewImg').src = pendingImage;
+            document.getElementById('imagePreview').classList.add('show');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function cancelImagePreview() {
+        pendingImage = null;
+        document.getElementById('imagePreview').classList.remove('show');
+        document.getElementById('fileInput').value = '';
+    }
+
+    function openPhotoViewer(src) {
+        document.getElementById('viewerImage').src = src;
+        document.getElementById('photoViewer').classList.add('show');
+    }
+
+    function closePhotoViewer() {
+        document.getElementById('photoViewer').classList.remove('show');
+    }
+
+    function isScrolledToBottom() {
+        const msgDiv = document.getElementById('messages');
+        return Math.abs(msgDiv.scrollHeight - msgDiv.scrollTop - msgDiv.clientHeight) < 50;
+    }
+
+    function scrollToBottom() {
+        const msgDiv = document.getElementById('messages');
+        msgDiv.scrollTop = msgDiv.scrollHeight;
+    }
+
+    function showAuthError(message) {
+        const errorDiv = document.getElementById('auth-error');
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = message;
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 3000);
+    }
+
+    function showAuthSuccess(message) {
+        const successDiv = document.getElementById('auth-success');
+        successDiv.style.display = 'block';
+        successDiv.textContent = message;
+        setTimeout(() => {
+            successDiv.style.display = 'none';
+        }, 3000);
+    }
+
+    window.onload = init;
+</script>
+
+</body>
+</html>
